@@ -1,0 +1,11 @@
+# Files to exclude from package
+.git/
+.github/
+spec/
+dist/
+package/
+.rspec
+.rubocop.yml
+README.md
+*.md
+**/*_spec.rb

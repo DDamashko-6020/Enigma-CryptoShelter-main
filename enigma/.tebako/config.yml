@@ -1,0 +1,18 @@
+# Tebako configuration for Enigma CryptoShelter
+# https://github.com/tamatebako/tebako
+
+app_name:    "enigma_cryptoshelter"
+root:        "."
+entry_point: "main.rb"
+ruby_version: "3.2.2"
+
+# Dependencies to bundle
+gemfile: "Gemfile"
+
+# Exclude development/test gems from package
+without:
+  - development
+  - test
+
+# Output settings
+output_dir: "dist"

@@ -1,0 +1,54 @@
+name: Enigma CryptoShelter CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    name: RSpec + Coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./enigma
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: ./enigma
+
+      - name: Install system dependencies
+        run: sudo apt-get install -y tcl tk
+
+      - name: Run RSpec with coverage
+        run: bundle exec rspec --format progress
+        env:
+          COVERAGE: true
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: enigma/coverage/
+
+  lint:
+    name: RuboCop
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./enigma
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: ./enigma
+      - name: Run RuboCop
+        run: bundle exec rubocop --format github
