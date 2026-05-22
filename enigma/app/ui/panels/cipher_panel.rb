@@ -199,8 +199,8 @@ module Enigma
         end
         @cipher_text.pack(fill: :x, padx: 16, pady: [4, 16])
 
-        copy_btn = TkLabel.new(right) do
-          text '  ⸉ COPIAR'
+        invert_btn = TkLabel.new(right) do
+          text '  ⤮ INVERTIR  '
           font TkFont.new("#{FONT} 9 bold")
           foreground COLORS[:orange]
           background COLORS[:bg_panel]
@@ -210,8 +210,8 @@ module Enigma
           highlightcolor COLORS[:orange]
           highlightbackground COLORS[:border]
         end
-        copy_btn.pack(anchor: 'e', padx: 16, pady: [0, 16])
-        copy_btn.bind('Button-1') { copy_ciphertext }
+        invert_btn.pack(anchor: 'e', padx: 16, pady: [0, 16])
+        invert_btn.bind('Button-1') { swap_fields }
       end
 
       def on_encrypt
@@ -319,12 +319,18 @@ module Enigma
         @cipher_text.configure('state' => 'disabled')
       end
 
-      def copy_ciphertext
-        text = @cipher_text.get('1.0', 'end').strip
-        return if text.empty?
+      def swap_fields
+        plain = @plain_text.get('1.0', 'end').strip
+        cipher = @cipher_text.get('1.0', 'end').strip
 
-        @root.clipboard_clear
-        @root.clipboard_append(text)
+        @plain_text.delete('1.0', 'end')
+        @plain_text.insert('end', cipher)
+        update_char_count
+
+        @cipher_text.configure('state' => 'normal')
+        @cipher_text.delete('1.0', 'end')
+        @cipher_text.insert('end', plain)
+        @cipher_text.configure('state' => 'disabled')
       end
     end
   end
