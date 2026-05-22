@@ -203,7 +203,8 @@ module Enigma
         end
         btn.pack(side: :right, padx: [6, 0])
         btn.bind('Button-1') { send(copy_method) }
-        instance_variable_set("@copy_#{copy_method.to_s.sub('on_copy_', '')}_btn".to_sym, btn)
+        ivar = copy_method == :on_copy_username ? :@copy_user_btn : :@copy_pass_btn
+        instance_variable_set(ivar, btn)
       end
 
       def build_password_section(parent)

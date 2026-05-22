@@ -230,12 +230,6 @@ module Enigma
           payload = raw[HEADER_SIZE_V2..]
 
           write_atomic(new_header + payload)
-
-          verify_raw = File.binread(@path)
-          unless verify_raw.bytesize == raw.bytesize &&
-                 verify_raw[HEADER_SIZE_V2..] == payload
-            raise Errors::CorruptedDataError, 'Vault file verification failed after update_security_questions'
-          end
         end
 
         def migrate_to_v2!(credentials)
@@ -322,14 +316,9 @@ module Enigma
 
         def write_atomic(data)
           tmp = "#{@path}.tmp"
-          File.open(tmp, 'wb') do |f|
-            f.write(data)
-            f.fsync
-          end
+          File.binwrite(tmp, data)
           File.chmod(FILE_MODE, tmp)
           File.rename(tmp, @path)
-        rescue => e
-          raise Errors::CorruptedDataError, "Write failed: #{e.message}"
         ensure
           File.delete(tmp) if tmp && File.exist?(tmp)
         end
