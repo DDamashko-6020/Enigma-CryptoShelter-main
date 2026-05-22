@@ -17,6 +17,7 @@ module Enigma
 
       def initialize(parent)
         @frame = TkFrame.new(parent) { background COLORS[:bg_main] }
+        @root = Tk.root
         @key_visible = false
         build_layout
       end
@@ -322,8 +323,8 @@ module Enigma
         text = @cipher_text.get('1.0', 'end').strip
         return if text.empty?
 
-        TkClipboard.clear
-        TkClipboard.add(text)
+        @root.clipboard_clear
+        @root.clipboard_append(text)
       end
     end
   end
