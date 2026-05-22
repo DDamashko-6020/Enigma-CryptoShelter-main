@@ -40,6 +40,8 @@ module Enigma
         @root.background COLORS[:bg_main]
         @root.minsize(1200, 800)
         @root.geometry('1200x800+50+50')
+        icon_path = File.join(__dir__, '..', '..', 'enigma_icon.ico')
+        @root.iconbitmap(icon_path) if File.exist?(icon_path)
       end
 
       def run

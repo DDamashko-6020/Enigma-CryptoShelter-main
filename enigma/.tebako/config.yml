@@ -4,7 +4,7 @@
 app_name:    "enigma_cryptoshelter"
 root:        "."
 entry_point: "main.rb"
-ruby_version: "3.2.2"
+ruby_version: "3.4.2"
 
 # Dependencies to bundle
 gemfile: "Gemfile"

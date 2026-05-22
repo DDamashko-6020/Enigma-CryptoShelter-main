@@ -3,6 +3,7 @@
 $LOAD_PATH.unshift File.join(__dir__, '..')
 $LOAD_PATH.unshift File.join(__dir__, '..', 'app')
 
+require 'tmpdir'
 require 'core/core'
 require 'utils/password_generator'
 require 'utils/validator'
