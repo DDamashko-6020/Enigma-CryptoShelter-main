@@ -292,9 +292,10 @@ module Enigma
           rescue OpenSSL::Cipher::CipherError => e
             raise Errors::AuthTagError, e.message
           ensure
-            tmp = "#{path}.reencrypt.tmp.tmp"
-            File.delete(tmp_path) if defined?(tmp_path) && tmp_path && File.exist?(tmp_path)
-            File.delete(tmp) if File.exist?(tmp)
+            orphans = []
+            orphans << tmp_path if defined?(tmp_path) && tmp_path
+            orphans << "#{path}.reencrypt.tmp.tmp"
+            orphans.each { |p| File.delete(p) if File.exist?(p) }
           end
         end
 

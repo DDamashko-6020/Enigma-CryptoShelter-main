@@ -7,6 +7,7 @@
 
 require 'tk'
 require 'tkextlib/tile'
+require 'tkextlib/tile/tcombobox'
 
 module Enigma
   module UI

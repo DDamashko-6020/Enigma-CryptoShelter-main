@@ -61,7 +61,7 @@ module Enigma
 
           salt = raw[MAGIC_SIZE, SALT_SIZE]
           stored_hash = raw[MAGIC_SIZE + SALT_SIZE, HASH_SIZE]
-          return nil unless stored_hash == derive_verify_hash(master_password, salt)
+          return nil unless constant_time_compare?(stored_hash, derive_verify_hash(master_password, salt))
 
           { salt: salt, questions: load_questions_with_hashes }
         rescue StandardError
@@ -86,7 +86,7 @@ module Enigma
           return false unless questions.size == answers.size
 
           questions.zip(answers).all? do |q, a|
-            q['h'] == OpenSSL::Digest::SHA256.hexdigest(a.strip.downcase)
+            constant_time_compare?(q['h'], OpenSSL::Digest::SHA256.hexdigest(a.strip.downcase))
           end
         rescue StandardError
           false
@@ -164,6 +164,14 @@ module Enigma
           km = Core::KeyMaster.instance
           keys = km.derive_session_keys(password, salt)
           OpenSSL::Digest::SHA256.digest(keys[:vault_key])
+        end
+
+        def constant_time_compare?(left, right)
+          return false unless left.bytesize == right.bytesize
+
+          result = 0
+          left.bytes.zip(right.bytes) { |x, y| result |= x ^ y }
+          result.zero?
         end
       end
     end

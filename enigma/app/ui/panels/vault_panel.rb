@@ -7,6 +7,8 @@
 
 require 'tk'
 require 'tkextlib/tile'
+require 'tkextlib/tile/treeview'
+require 'tkextlib/tile/tscrollbar'
 
 module Enigma
   module UI

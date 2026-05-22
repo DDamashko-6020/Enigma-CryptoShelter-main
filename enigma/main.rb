@@ -3,6 +3,9 @@
 
 require 'tk'
 require 'tkextlib/tile'
+require 'tkextlib/tile/tcombobox'
+require 'tkextlib/tile/treeview'
+require 'tkextlib/tile/tscrollbar'
 require 'ostruct'
 
 # Tk 0.6.0 + Ruby 3.x frozen_string_literal compatibility
