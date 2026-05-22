@@ -1,1 +1,7 @@
 contexto_proyecto.txt
+dist/
+*.vault
+*.dat
+*.tmp
+.bundle/
+~/.enigma_cryptoshelter/
