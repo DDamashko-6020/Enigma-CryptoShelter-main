@@ -171,18 +171,37 @@ module Enigma
 
         @create_btn.configure(text: '  Creando vault...  ', state: 'disabled')
         @error_label.configure(text: '')
-        @create_btn.update
+
+        @create_queue = Queue.new
 
         Thread.new do
-          begin
-            session = Core::Facades::VaultFacade.create(pw)
-            TkAfter.new(0, 1) { @on_success.call(session) }.start
-          rescue => e
-            TkAfter.new(0, 1) do
-              show_error("Error: #{e.message}")
-              @create_btn.configure(text: '  CREAR VAULT  ', state: 'normal')
-            end.start
-          end
+          session = Core::Facades::VaultFacade.create(pw)
+          @create_queue << [:ok, session]
+        rescue => e
+          @create_queue << [:error, e.message]
+        end
+
+        poll_create_queue
+      end
+
+      def poll_create_queue
+        result = begin
+          @create_queue.pop(true)
+        rescue ThreadError
+          nil
+        end
+
+        if result.nil?
+          TkAfter.new(100, 1) { poll_create_queue }.start
+          return
+        end
+
+        case result[0]
+        when :ok
+          @on_success.call(result[1])
+        when :error
+          show_error("Error: #{result[1]}")
+          @create_btn.configure(text: '  CREAR VAULT  ', state: 'normal')
         end
       end
 

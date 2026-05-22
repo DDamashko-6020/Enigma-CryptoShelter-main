@@ -78,9 +78,6 @@ module Enigma
             values QUESTIONS
             textvariable q_var
             state 'readonly'
-            background COLORS[:bg_input]
-            foreground COLORS[:fg_primary]
-            font TkFont.new("#{FONT} 10")
           end
           q_combo.pack(fill: :x, padx: 16, pady: [4, 0])
           @q_vars << q_var
@@ -169,22 +166,41 @@ module Enigma
 
         @continue_btn.configure(text: '  Guardando...  ', state: 'disabled')
         @error_label.configure(text: '')
-        @continue_btn.update
+
+        @questions_queue = Queue.new
 
         Thread.new do
-          begin
-            cipher = Core::Cipher::AesGcm.new(vault_key)
-            storage = Core::Vault::Storage.new(
-              Core::Vault::Storage::VAULT_PATH, cipher
-            )
-            storage.update_security_questions!(questions, answers, vault_key)
-            TkAfter.new(0, 1) { @on_success.call(@session) }.start
-          rescue => e
-            TkAfter.new(0, 1) do
-              show_error("Error: #{e.message}")
-              @continue_btn.configure(text: '  CONTINUAR  ', state: 'normal')
-            end.start
-          end
+          cipher = Core::Cipher::AesGcm.new(vault_key)
+          storage = Core::Vault::Storage.new(
+            Core::Vault::Storage::VAULT_PATH, cipher
+          )
+          storage.update_security_questions!(questions, answers, vault_key)
+          @questions_queue << [:ok, @session]
+        rescue => e
+          @questions_queue << [:error, e.message]
+        end
+
+        poll_questions_queue
+      end
+
+      def poll_questions_queue
+        result = begin
+          @questions_queue.pop(true)
+        rescue ThreadError
+          nil
+        end
+
+        if result.nil?
+          TkAfter.new(100, 1) { poll_questions_queue }.start
+          return
+        end
+
+        case result[0]
+        when :ok
+          @on_success.call(result[1])
+        when :error
+          show_error("Error: #{result[1]}")
+          @continue_btn.configure(text: '  CONTINUAR  ', state: 'normal')
         end
       end
 

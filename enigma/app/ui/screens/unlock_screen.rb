@@ -125,25 +125,44 @@ module Enigma
 
         @unlock_btn.configure(text: '  Verificando...  ', state: 'disabled')
         @error_label.configure(text: '')
-        @unlock_btn.update
+
+        @unlock_queue = Queue.new
 
         Thread.new do
-          begin
-            session = Core::Facades::VaultFacade.open(pw)
-            TkAfter.new(0, 1) { @on_success.call(session) }.start
-          rescue Errors::AuthTagError
-            TkAfter.new(0, 1) do
-              show_inline_error('Clave incorrecta')
-              @unlock_btn.configure(text: '  ABRIR VAULT  ', state: 'normal')
-              @pw_entry.delete(0, 'end')
-              @pw_entry.focus
-            end.start
-          rescue => e
-            TkAfter.new(0, 1) do
-              show_inline_error("Error: #{e.message}")
-              @unlock_btn.configure(text: '  ABRIR VAULT  ', state: 'normal')
-            end.start
-          end
+          session = Core::Facades::VaultFacade.open(pw)
+          @unlock_queue << [:ok, session]
+        rescue Errors::AuthTagError
+          @unlock_queue << [:error_auth]
+        rescue => e
+          @unlock_queue << [:error, e.message]
+        end
+
+        poll_unlock_queue
+      end
+
+      def poll_unlock_queue
+        result = begin
+          @unlock_queue.pop(true)
+        rescue ThreadError
+          nil
+        end
+
+        if result.nil?
+          TkAfter.new(100, 1) { poll_unlock_queue }.start
+          return
+        end
+
+        case result[0]
+        when :ok
+          @on_success.call(result[1])
+        when :error_auth
+          show_inline_error('Clave incorrecta')
+          @unlock_btn.configure(text: '  ABRIR VAULT  ', state: 'normal')
+          @pw_entry.delete(0, 'end')
+          @pw_entry.focus
+        when :error
+          show_inline_error("Error: #{result[1]}")
+          @unlock_btn.configure(text: '  ABRIR VAULT  ', state: 'normal')
         end
       end
 

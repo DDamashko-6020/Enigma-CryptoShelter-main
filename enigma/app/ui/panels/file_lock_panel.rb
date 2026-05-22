@@ -263,21 +263,23 @@ module Enigma
           return
         end
 
+        return if @processing
+
+        @processing = true
         set_processing(true)
-        Tk.update
 
         filelock_key = @session[:filelock_key]
         facade = Core::Facades::FileLockFacade.new
-        queue = Queue.new
+        @lock_queue = Queue.new
 
         Thread.new do
-          output = facade.lock(path, filelock_key, share)
-          queue << [:ok, output]
+          facade.lock(path, filelock_key, share)
+          @lock_queue << [:ok, "#{path}.ultra"]
         rescue StandardError => e
-          queue << [:error, e.message]
+          @lock_queue << [:error, e.message]
         end
 
-        poll_lock(queue)
+        poll_lock_queue
       end
 
       def on_unlock
@@ -302,55 +304,54 @@ module Enigma
           return
         end
 
-        set_processing(false)
-        Tk.update
+        return if @processing
+
+        @processing = true
+        set_processing(true)
 
         filelock_key = @session[:filelock_key]
         facade = Core::Facades::FileLockFacade.new
-        queue = Queue.new
+        @lock_queue = Queue.new
 
         Thread.new do
           facade.unlock(path, filelock_key, share)
-          queue << [:ok]
+          @lock_queue << [:ok, path.delete_suffix('.ultra')]
         rescue Errors::AuthTagError
-          queue << [:error, 'Wrong master password or share key']
+          @lock_queue << [:error, 'Wrong master password or share key']
         rescue StandardError => e
-          queue << [:error, e.message]
+          @lock_queue << [:error, e.message]
         end
 
-        poll_lock(queue)
+        poll_lock_queue
       end
 
-      def poll_lock(queue)
-        @poll_timer = TkAfter.new(100, 1) do
-          result = begin
-            queue.pop(true)
-          rescue ThreadError
-            nil
-          end
-
-          if result.nil?
-            poll_lock(queue)
-            return
-          end
-
-          @poll_timer = nil
-          set_processing(false)
-
-          case result[0]
-          when :ok
-            @output_path.delete(0, 'end')
-            @output_path.insert(0, result[1].to_s)
-            @status_label.configure(
-              'text' => '  ●  OPERATION COMPLETE',
-              'foreground' => COLORS[:green_ok]
-            )
-          when :error
-            Tk.messageBox('type' => 'ok', 'icon' => 'error',
-                          'title' => 'Error', 'message' => result[1])
-          end
+      def poll_lock_queue
+        result = begin
+          @lock_queue.pop(true)
+        rescue ThreadError
+          nil
         end
-        @poll_timer.start
+
+        if result.nil?
+          TkAfter.new(100, 1) { poll_lock_queue }.start
+          return
+        end
+
+        @processing = false
+        set_processing(false)
+
+        case result[0]
+        when :ok
+          @output_path.delete(0, 'end')
+          @output_path.insert(0, result[1].to_s)
+          @status_label.configure(
+            'text' => '  ●  OPERATION COMPLETE',
+            'foreground' => COLORS[:green_ok]
+          )
+        when :error
+          Tk.messageBox('type' => 'ok', 'icon' => 'error',
+                        'title' => 'Error', 'message' => result[1])
+        end
       end
 
       def set_processing(active)

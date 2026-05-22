@@ -24,6 +24,7 @@ require_relative 'utils/password_generator'
 require_relative 'utils/validator'
 require_relative 'utils/file_handler'
 require_relative 'app/ui/theme'
+Enigma::Theme.setup_ttk_styles!
 require_relative 'app/ui/main_window'
 
 Enigma::UI::MainWindow.new.run

@@ -65,8 +65,6 @@ module Enigma
           textvariable @algo_var
           values Core::Facades::CipherFacade.available_algorithms
           state 'readonly'
-          font TkFont.new("#{FONT} 10")
-          foreground COLORS[:fg_primary]
         end
         @algo_combo.pack(fill: :x, padx: 16, pady: [4, 12])
 
@@ -226,13 +224,20 @@ module Enigma
           return
         end
 
-        result = Core::Facades::CipherFacade.encrypt(algo, key, plain)
-        set_ciphertext(result)
-        @status_label.configure('text' => "  ●  ENCRYPTED (#{algo})",
-                                'foreground' => COLORS[:green_ok])
-      rescue Errors::CipherError => e
-        Tk.messageBox('type' => 'ok', 'icon' => 'error',
-                      'title' => 'Error', 'message' => e.message)
+        @status_label.configure('text' => '  ●  ENCRYPTING...',
+                                'foreground' => COLORS[:orange])
+        @encrypt_btn.configure('state' => 'disabled')
+        @decrypt_btn.configure('state' => 'disabled')
+        @cipher_queue = Queue.new
+
+        Thread.new do
+          result = Core::Facades::CipherFacade.encrypt(algo, key, plain)
+          @cipher_queue << [:ok, result, algo]
+        rescue Errors::CipherError => e
+          @cipher_queue << [:error, e.message]
+        end
+
+        poll_cipher_queue(:encrypt)
       end
 
       def on_decrypt
@@ -246,15 +251,54 @@ module Enigma
           return
         end
 
-        result = Core::Facades::CipherFacade.decrypt(algo, key, cipher)
-        @plain_text.delete('1.0', 'end')
-        @plain_text.insert('end', result)
-        update_char_count
-        @status_label.configure('text' => "  ●  DECRYPTED (#{algo})",
-                                'foreground' => COLORS[:green_ok])
-      rescue Errors::CipherError => e
-        Tk.messageBox('type' => 'ok', 'icon' => 'error',
-                      'title' => 'Error', 'message' => e.message)
+        @status_label.configure('text' => '  ●  DECRYPTING...',
+                                'foreground' => COLORS[:orange])
+        @encrypt_btn.configure('state' => 'disabled')
+        @decrypt_btn.configure('state' => 'disabled')
+        @cipher_queue = Queue.new
+
+        Thread.new do
+          result = Core::Facades::CipherFacade.decrypt(algo, key, cipher)
+          @cipher_queue << [:ok, result, algo]
+        rescue Errors::CipherError => e
+          @cipher_queue << [:error, e.message]
+        end
+
+        poll_cipher_queue(:decrypt)
+      end
+
+      def poll_cipher_queue(mode)
+        result = begin
+          @cipher_queue.pop(true)
+        rescue ThreadError
+          nil
+        end
+
+        if result.nil?
+          TkAfter.new(100, 1) { poll_cipher_queue(mode) }.start
+          return
+        end
+
+        @encrypt_btn.configure('state' => 'normal')
+        @decrypt_btn.configure('state' => 'normal')
+
+        case result[0]
+        when :ok
+          if mode == :encrypt
+            set_ciphertext(result[1])
+          else
+            @plain_text.delete('1.0', 'end')
+            @plain_text.insert('end', result[1])
+            update_char_count
+          end
+          @status_label.configure(
+            'text' => "  ●  #{mode == :encrypt ? 'ENCRYPTED' : 'DECRYPTED'} (#{result[2]})",
+            'foreground' => COLORS[:green_ok]
+          )
+        when :error
+          Tk.messageBox('type' => 'ok', 'icon' => 'error',
+                        'title' => 'Error', 'message' => result[1])
+        end
       end
 
       def toggle_key

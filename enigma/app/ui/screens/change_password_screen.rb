@@ -168,30 +168,43 @@ module Enigma
 
         @error_label.configure(text: '')
         @change_btn.configure(text: 'Cambiando...', state: 'disabled')
-        @change_btn.update
+
+        @change_queue = Queue.new
 
         Thread.new do
-          begin
-            new_session = Core::Facades::VaultFacade.change_password(
-              @current_keys, new_pass, confirm
-            )
-            TkAfter.new(0, 1) { @on_success.call(new_session) }.start
-          rescue Errors::AuthTagError
-            TkAfter.new(0, 1) do
-              @error_label.configure(text: 'Error al descifrar vault. Intenta de nuevo.')
-              @change_btn.configure(text: 'CAMBIAR CLAVE', state: 'normal')
-            end.start
-          rescue Errors::VaultError, Errors::InvalidKeyError => e
-            TkAfter.new(0, 1) do
-              @error_label.configure(text: e.message)
-              @change_btn.configure(text: 'CAMBIAR CLAVE', state: 'normal')
-            end.start
-          rescue => e
-            TkAfter.new(0, 1) do
-              @error_label.configure(text: "Error: #{e.message}")
-              @change_btn.configure(text: 'CAMBIAR CLAVE', state: 'normal')
-            end.start
-          end
+          new_session = Core::Facades::VaultFacade.change_password(
+            @current_keys, new_pass, confirm
+          )
+          @change_queue << [:ok, new_session]
+        rescue Errors::AuthTagError
+          @change_queue << [:error, 'Error al descifrar vault. Intenta de nuevo.']
+        rescue Errors::VaultError, Errors::InvalidKeyError => e
+          @change_queue << [:error, e.message]
+        rescue => e
+          @change_queue << [:error, "Error: #{e.message}"]
+        end
+
+        poll_change_queue
+      end
+
+      def poll_change_queue
+        result = begin
+          @change_queue.pop(true)
+        rescue ThreadError
+          nil
+        end
+
+        if result.nil?
+          TkAfter.new(100, 1) { poll_change_queue }.start
+          return
+        end
+
+        case result[0]
+        when :ok
+          @on_success.call(result[1])
+        when :error
+          @error_label.configure(text: result[1])
+          @change_btn.configure(text: 'CAMBIAR CLAVE', state: 'normal')
         end
       end
 

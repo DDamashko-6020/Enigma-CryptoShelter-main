@@ -212,36 +212,24 @@ module Enigma
           @change_pass_btn.configure(text: 'Cambiando...', state: 'disabled')
           @change_pass_btn.update
 
+          @pass_queue = Queue.new
+
           Thread.new do
-            begin
-              current_keys = verify_current_password!(current)
-              new_session = Core::Facades::VaultFacade.change_password(
-                current_keys, new_p, confirm
-              )
-              TkAfter.new(0, 1) do
-                @session = new_session
-                @on_session_update.call(new_session)
-                show_success('Clave cambiada correctamente')
-                clear_password_fields
-                @change_pass_btn.configure(text: 'CAMBIAR CLAVE', state: 'normal')
-              end.start
-            rescue Errors::AuthTagError
-              TkAfter.new(0, 1) do
-                @pass_error.configure(text: 'Clave actual incorrecta')
-                @change_pass_btn.configure(text: 'CAMBIAR CLAVE', state: 'normal')
-              end.start
-            rescue Errors::VaultError, Errors::InvalidKeyError => e
-              TkAfter.new(0, 1) do
-                @pass_error.configure(text: e.message)
-                @change_pass_btn.configure(text: 'CAMBIAR CLAVE', state: 'normal')
-              end.start
-            rescue => e
-              TkAfter.new(0, 1) do
-                @pass_error.configure(text: "Error: #{e.message}")
-                @change_pass_btn.configure(text: 'CAMBIAR CLAVE', state: 'normal')
-              end.start
-            end
+            current_keys = verify_current_password!(current)
+            new_session = Core::Facades::VaultFacade.change_password(
+              current_keys, new_p, confirm
+            )
+            Core::Auth::AuthConfig.new.reset_master_password(new_p) if File.exist?(Core::Auth::AuthConfig::AUTH_PATH)
+            @pass_queue << [:ok, new_session]
+          rescue Errors::AuthTagError
+            @pass_queue << [:error, 'Clave actual incorrecta']
+          rescue Errors::VaultError, Errors::InvalidKeyError => e
+            @pass_queue << [:error, e.message]
+          rescue StandardError => e
+            @pass_queue << [:error, "Error: #{e.message}"]
           end
+
+          poll_pass_queue
         end
 
         def on_change_questions
@@ -250,6 +238,31 @@ module Enigma
             title: 'Próximamente',
             message: "Actualización de preguntas disponible\nen la próxima versión."
           )
+        end
+
+        def poll_pass_queue
+          result = begin
+            @pass_queue.pop(true)
+          rescue ThreadError
+            nil
+          end
+
+          if result.nil?
+            TkAfter.new(100, 1) { poll_pass_queue }.start
+            return
+          end
+
+          case result[0]
+          when :ok
+            @session = result[1]
+            @on_session_update.call(result[1])
+            show_success('Clave cambiada correctamente')
+            clear_password_fields
+          when :error
+            @pass_error.configure(text: result[1])
+          end
+
+          @change_pass_btn.configure(text: 'CAMBIAR CLAVE', state: 'normal')
         end
 
         def verify_current_password!(password)

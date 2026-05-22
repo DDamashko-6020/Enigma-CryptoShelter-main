@@ -134,38 +134,55 @@ module Enigma
 
         @verify_btn.configure(text: 'Verificando...', state: 'disabled')
         @error_label.configure(text: '')
-        @verify_btn.update
+
+        @recover_queue = Queue.new
 
         Thread.new do
-          begin
-            unless Core::Vault::Storage.verify_answers(answers)
-              TkAfter.new(0, 1) do
-                @error_label.configure(text: 'Respuestas incorrectas', foreground: COLORS[:red_err])
-                @verify_btn.configure(text: '  VERIFICAR RESPUESTAS  ', state: 'normal')
-                clear_answer_fields
-              end.start
-              next
-            end
-
-            recovered = Core::Vault::Storage.read_recovery_data(nil, answers)
-            unless recovered
-              TkAfter.new(0, 1) do
-                @error_label.configure(text: 'Error al recuperar clave', foreground: COLORS[:red_err])
-                @verify_btn.configure(text: '  VERIFICAR RESPUESTAS  ', state: 'normal')
-              end.start
-              next
-            end
-
-            TkAfter.new(0, 1) do
-              @frame.pack_forget
-              @on_success.call(recovered)
-            end.start
-          rescue => e
-            TkAfter.new(0, 1) do
-              @error_label.configure(text: "Error: #{e.message}", foreground: COLORS[:red_err])
-              @verify_btn.configure(text: '  VERIFICAR RESPUESTAS  ', state: 'normal')
-            end.start
+          unless Core::Vault::Storage.verify_answers(answers)
+            @recover_queue << [:verify_fail]
+            next
           end
+
+          recovered = Core::Vault::Storage.read_recovery_data(nil, answers)
+          unless recovered
+            @recover_queue << [:no_data]
+            next
+          end
+
+          @recover_queue << [:ok, recovered]
+        rescue => e
+          @recover_queue << [:error, e.message]
+        end
+
+        poll_recover_queue
+      end
+
+      def poll_recover_queue
+        result = begin
+          @recover_queue.pop(true)
+        rescue ThreadError
+          nil
+        end
+
+        if result.nil?
+          TkAfter.new(100, 1) { poll_recover_queue }.start
+          return
+        end
+
+        case result[0]
+        when :ok
+          @frame.pack_forget
+          @on_success.call(result[1])
+        when :verify_fail
+          @error_label.configure(text: 'Respuestas incorrectas', foreground: COLORS[:red_err])
+          @verify_btn.configure(text: '  VERIFICAR RESPUESTAS  ', state: 'normal')
+          clear_answer_fields
+        when :no_data
+          @error_label.configure(text: 'Error al recuperar clave', foreground: COLORS[:red_err])
+          @verify_btn.configure(text: '  VERIFICAR RESPUESTAS  ', state: 'normal')
+        when :error
+          @error_label.configure(text: "Error: #{result[1]}", foreground: COLORS[:red_err])
+          @verify_btn.configure(text: '  VERIFICAR RESPUESTAS  ', state: 'normal')
         end
       end
 
