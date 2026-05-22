@@ -17,7 +17,7 @@ module Enigma
     class KeyMaster
       include Singleton
 
-      ITERATIONS  = ENV.fetch('ENIGMA_PBKDF2_ITER', '600000').to_i
+      ITERATIONS  = ENV.fetch('ENIGMA_PBKDF2_ITER', '100000').to_i
       KEY_LENGTH  = 32
       SALT_LENGTH = 32
       DIGEST      = 'SHA256'
